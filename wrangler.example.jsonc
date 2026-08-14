@@ -1,0 +1,75 @@
+/**
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "bcnetmgr",
+	"main": "src/main.py",
+	"compatibility_date": "2026-05-25",
+	"compatibility_flags": [
+		"python_workers"
+	],
+	"vars": {
+		"WEBHOOK_URL": "https://bcnetmgr.example.com/",
+		"USER_CHANNEL_ID": "-1000000000000",
+		"NODE_LIST": "US_1", // Use a semicolon to separate multiple items.
+		"NODE_CONFIG_VERSION": "1", // Increment this value when making changes that may affect the node URI.
+		"CF_ACCOUNT_ID": "FILLME",
+		"CF_SCRIPT_NAME": "bcnetmgr",
+		"CF_USER_DURABLE_OBJECT_NAMESPACE_ID": "FILLME",
+		"_US_1_NAME": "US-1",
+		"_US_1_IPV4": "FILLME",
+		"_US_1_IPV6": "FILLME",
+		"_US_1_GRPC_GATEWAY": "https://us1-grpc.example.com",
+		"_US_1_DAILY_USAGE_LIMIT": "0", // Unit: bytes; 0 indicates no limit.
+		"_US_1_INBOUND_LIST": "VLESS_REALITY;VLESS_XHTTP", // Use a semicolon to separate multiple items.
+		"_US_1_INBOUND__VLESS_REALITY_NAME": "REALITY-US",
+		"_US_1_INBOUND__VLESS_REALITY_TYPE": "reality",
+		"_US_1_INBOUND__VLESS_REALITY_REGION": "US", // See util.py, method: emoji_from_country
+		"_US_1_INBOUND__VLESS_REALITY_DESCRIPTION": "FILLME",
+		"_US_1_INBOUND__VLESS_REALITY_RECOMMENDED": "1", // Optional, default: 0
+		"_US_1_INBOUND__VLESS_REALITY_PORT": "443", // Optional, default: 0 (auto)
+		"_US_1_INBOUND__VLESS_REALITY_DISABLE_IPV4": "0", // Optional, default: 0
+		"_US_1_INBOUND__VLESS_REALITY_DISABLE_IPV6": "0", // Optional, default: 0
+		"_US_1_INBOUND__VLESS_REALITY_DEFAULT_FLOW": "xtls-rprx-vision", // Optional, default: ''
+		"_US_1_INBOUND__VLESS_REALITY_FINGERPRINT": "firefox",
+		"_US_1_INBOUND__VLESS_REALITY_PUBLIC_KEY": "FILLME",
+		"_US_1_INBOUND__VLESS_XHTTP_NAME": "US-CLOUDFLARE",
+		"_US_1_INBOUND__VLESS_XHTTP_TYPE": "xhttp",
+		"_US_1_INBOUND__VLESS_XHTTP_REGION": "US",
+		"_US_1_INBOUND__VLESS_XHTTP_DESCRIPTION": "FILLME",
+		"_US_1_INBOUND__VLESS_XHTTP_SECURITY": "tls", // Optional, default: 'none'
+		"_US_1_INBOUND__VLESS_XHTTP_FINGERPRINT": "firefox"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "USER_DURABLE_OBJECT",
+				"class_name": "UserDurableObject"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v2",
+			"new_sqlite_classes": [
+				"UserDurableObject"
+			]
+		}
+	],
+	"routes": [
+		{
+			"pattern": "bcnetmgr.example.com",
+			"custom_domain": true
+		}
+	],
+	"placement": {
+		"mode": "smart"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"workers_dev": false,
+	"preview_urls": false
+}

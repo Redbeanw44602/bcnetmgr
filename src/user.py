@@ -63,10 +63,6 @@ async def add_user(env: Env, user_id: int) -> tuple[AddUserResult, 'UserDurableO
 
 
 async def suspend_user(env: Env, user_id: int) -> SuspendUserResult:
-    """
-    Raises:
-        httpx.RequestError: Requests to the backend service may fail.
-    """
     from serv import ServList, RemoveUserResult
 
     user = UserDurableObject.get_stub(env, user_id)
@@ -88,10 +84,6 @@ async def suspend_user(env: Env, user_id: int) -> SuspendUserResult:
 
 
 async def resume_user(env: Env, user_id: int) -> ResumeUserResult:
-    """
-    Raises:
-        httpx.RequestError: Requests to the backend service may fail.
-    """
     from serv import ServList, AddUserResult
 
     user = UserDurableObject.get_stub(env, user_id)

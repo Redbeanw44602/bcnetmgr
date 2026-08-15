@@ -5,6 +5,7 @@ from enum import Enum, IntEnum, Flag, auto
 from dataclasses import dataclass, field, asdict
 from datetime import date as date_
 
+import httpx
 from workers import DurableObject
 from pyodide.ffi import JsException
 
@@ -62,6 +63,10 @@ async def add_user(env: Env, user_id: int) -> tuple[AddUserResult, 'UserDurableO
 
 
 async def suspend_user(env: Env, user_id: int) -> SuspendUserResult:
+    """
+    Raises:
+        httpx.RequestError: Requests to the backend service may fail.
+    """
     from serv import ServList, RemoveUserResult
 
     user = UserDurableObject.get_stub(env, user_id)
@@ -73,13 +78,20 @@ async def suspend_user(env: Env, user_id: int) -> SuspendUserResult:
     serv_mgr = ServList(env)
     has_error = False
     for _, inbound in serv_mgr.get_inbounds():
-        result = inbound.remove_user(user_id)
-        if result not in (RemoveUserResult.SUCCESS, RemoveUserResult.NOT_FOUND):
+        try:
+            result = inbound.remove_user(user_id)
+            if result not in (RemoveUserResult.SUCCESS, RemoveUserResult.NOT_FOUND):
+                has_error = True
+        except httpx.RequestError:
             has_error = True
     return SuspendUserResult.SUCCESS if not has_error else SuspendUserResult.HAS_ERROR
 
 
 async def resume_user(env: Env, user_id: int) -> ResumeUserResult:
+    """
+    Raises:
+        httpx.RequestError: Requests to the backend service may fail.
+    """
     from serv import ServList, AddUserResult
 
     user = UserDurableObject.get_stub(env, user_id)
@@ -91,8 +103,11 @@ async def resume_user(env: Env, user_id: int) -> ResumeUserResult:
     serv_mgr = ServList(env)
     has_error = False
     for _, inbound in serv_mgr.get_inbounds():
-        result = inbound.add_user(user_id, await user.get_uuid(), inbound.default_flow)
-        if result not in (AddUserResult.SUCCESS, AddUserResult.ALREADY_EXISTS):
+        try:
+            result = inbound.add_user(user_id, await user.get_uuid(), inbound.default_flow)
+            if result not in (AddUserResult.SUCCESS, AddUserResult.ALREADY_EXISTS):
+                has_error = True
+        except httpx.RequestError:
             has_error = True
     return ResumeUserResult.SUCCESS if not has_error else ResumeUserResult.HAS_ERROR
 

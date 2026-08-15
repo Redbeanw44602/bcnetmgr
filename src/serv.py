@@ -46,10 +46,13 @@ async def handle_serv(env: Env, path: list):
             for server, inbound in inbounds:
                 if server_filter and server.tag != server_filter:
                     continue
-                result = inbound.add_user(user_id, uuid, inbound.default_flow)
-                if result not in (AddUserResult.SUCCESS, AddUserResult.ALREADY_EXISTS):
-                    has_error = True
-                response += f'\t{server.name} {inbound.name} -> {result.name}\n'
+                try:
+                    result = inbound.add_user(user_id, uuid, inbound.default_flow)
+                    if result not in (AddUserResult.SUCCESS, AddUserResult.ALREADY_EXISTS):
+                        has_error = True
+                    response += f'\t{server.name} {inbound.name} -> {result.name}\n'
+                except httpx.RequestError as e:
+                    response += f'\t{server.name} {inbound.name} -> {e}\n'
 
         return ok(response) if not has_error else internal_server_error(response)
 
@@ -104,7 +107,11 @@ async def cron_serv(env: Env, date: date_):
     serv_mgr = ServList(env)
     servers = serv_mgr.get_servers_with_tag()
     for tag, server in servers:
-        stats = server.query_usage_stats(reset=True)
+        try:
+            stats = server.query_usage_stats(reset=True)
+        except httpx.RequestError as e:
+            print(f'Failed to query usage stats, error message: {e}')
+            continue
         for user_id, data in stats.items():
             if user_id not in user_map:
                 continue
@@ -262,6 +269,10 @@ class Inbound:
     security: str  # OPT
 
     def get_inbound_config(self) -> dict | None:
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         inbounds = self._parent._get_inbounds_config()
         for inbound in inbounds:
             if inbound['tag'] == self.tag:
@@ -269,6 +280,10 @@ class Inbound:
         return None
 
     def get_user(self, user_id: int) -> dict:
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         response = self._parent.post(
             '/xray.app.proxyman.command.HandlerService/GetInboundUsers',
             payload={
@@ -281,9 +296,17 @@ class Inbound:
         return response['users'][0]
 
     def has_user(self, user_id: int) -> bool:
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         return self.get_user(user_id)['account'] is not None
 
     def add_user(self, user_id: int, uuid: str, flow: str = None) -> AddUserResult:
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         account = {'id': uuid}
         if flow:
             account['flow'] = flow
@@ -310,6 +333,10 @@ class Inbound:
         return AddUserResult.UNKNOWN_ERROR
 
     def remove_user(self, user_id: int) -> RemoveUserResult:
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         operation = encode_typed_message(
             'app.proxyman.command.RemoveUserOperation',
             {
@@ -336,6 +363,10 @@ class InboundReality(Inbound):
     public_key: str
 
     def generate_share_url(self, user_id: int):
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         inbound = self.get_inbound_config()
         account = self.get_user(user_id)['account']
         if not inbound or account is None:
@@ -519,6 +550,10 @@ class Serv:
         return response['inbounds']
 
     def post(self, path: str, payload: dict = None):
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         assert path.startswith('/')
         response = self._client.post(f'{self.grpc_gateway}{path}', json=payload)
         return response.json()
@@ -529,6 +564,10 @@ class Serv:
     def get_usage_stats(
         self, user_id: int, up=False, down=False, reset=False
     ) -> tuple[GetUsageStatsResult, int]:
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         assert up != down
         updown = 'up' if up else 'down'
         response = self.post(
@@ -545,6 +584,10 @@ class Serv:
         return GetUsageStatsResult.UNKNOWN_ERROR, None
 
     def query_usage_stats(self, reset: bool = False):
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         response = self.post(
             '/xray.app.stats.command.StatsService/QueryStats',
             payload={'pattern': 'user>>>', 'reset': reset},
@@ -569,6 +612,10 @@ class Serv:
         return True  # TODO: DO A REAL HEALTH CHECK
 
     def get_sys_stats(self) -> SysStats:
+        """
+        Raises:
+            httpx.RequestError: Requests to the backend service may fail.
+        """
         response = self.post('/xray.app.stats.command.StatsService/GetSysStats')
         return SysStats(
             response['Uptime'],

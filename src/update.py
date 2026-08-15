@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 
+import httpx
 from workers import Response
 from telegram import Update, Chat, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.constants import ParseMode
@@ -24,7 +25,15 @@ from serv import (
 from http_code import ok
 from constant import TERM_OF_SERVICE
 from env import Env
-from util import emoji_from_country, b2mb, s2dhms, get_date_now, date2str, str2date
+from util import (
+    emoji_from_country,
+    b2mb,
+    s2dhms,
+    get_date_now,
+    date2str,
+    str2date,
+    unchecked_expect,
+)
 from cf import cf_api_client
 
 
@@ -269,20 +278,19 @@ async def handle_update(env: Env, payload) -> Response:
             uuid = await user.apply_reset_uuid()
             await user.clear_flatten_node_cache()
             for server, inbound in serv_mgr.get_inbounds():
-                result = inbound.remove_user(user_id)
-                if result not in (RemoveUserResult.SUCCESS, RemoveUserResult.NOT_FOUND):
-                    await update.message.reply_text(
-                        f'Something went wrong, RemoveUserResult = {result}'
+                try:
+                    unchecked_expect(
+                        inbound.remove_user(user_id)
+                        in (RemoveUserResult.SUCCESS, RemoveUserResult.NOT_FOUND)
                     )
-                    return
-                if await user.is_suspended():
-                    continue
-                result = inbound.add_user(user_id, uuid, inbound.default_flow)
-                if result != AddUserResult.SUCCESS:
-                    await update.message.reply_text(
-                        f'Something went wrong, AddUserResult = {result}'
+                    if await user.is_suspended():
+                        continue
+                    unchecked_expect(
+                        inbound.add_user(user_id, uuid, inbound.default_flow)
+                        == AddUserResult.SUCCESS
                     )
-                    return
+                except httpx.RequestError:
+                    unchecked_expect(False)
             await query.edit_message_text('Your UUID has been rotated.')
         else:
             await query.edit_message_text('Your UUID has not been changed.')
@@ -432,12 +440,13 @@ async def handle_update(env: Env, payload) -> Response:
         if query.data.endswith('_yes'):
             serv_mgr = ServList(env)
             for server, inbound in serv_mgr.get_inbounds():
-                result = inbound.remove_user(update.effective_user.id)
-                if result not in (RemoveUserResult.SUCCESS, RemoveUserResult.NOT_FOUND):
-                    await update.message.reply_text(
-                        f'Something went wrong, RemoveUserResult = {result}'
+                try:
+                    unchecked_expect(
+                        inbound.remove_user(update.effective_user.id)
+                        in (RemoveUserResult.SUCCESS, RemoveUserResult.NOT_FOUND)
                     )
-                    return
+                except httpx.RequestError:
+                    unchecked_expect(False)
             await user.delete()
             await query.edit_message_text('Your account has been deleted.')
         else:
@@ -460,8 +469,9 @@ async def handle_update(env: Env, payload) -> Response:
                 return
 
         # Get/Construct flatten nodes
-        user_id = update.effective_user.id
         user = get_user(update)
+        user_id = update.effective_user.id
+        uuid = await user.get_uuid()
 
         cache = FlattenNodeCache()
         cache_saved = await user.get_flatten_node_cache()
@@ -472,24 +482,27 @@ async def handle_update(env: Env, payload) -> Response:
             nodes.clear()
             serv_mgr = ServList(env)
             for server, inbound in serv_mgr.get_inbounds():
-                if not inbound.has_user(user_id) and not await user.is_suspended():
-                    result = inbound.add_user(user_id, await user.get_uuid(), inbound.default_flow)
-                    if result != AddUserResult.SUCCESS:
-                        await update.message.reply_text(
-                            f'Something went wrong, AddUserResult = {result}'
+                try:
+                    if not inbound.has_user(user_id) and not await user.is_suspended():
+                        unchecked_expect(
+                            inbound.add_user(user_id, uuid, inbound.default_flow)
+                            == AddUserResult.SUCCESS
                         )
-                        return
-                if isinstance(inbound, InboundReality):
-                    v4_link, v6_link = inbound.generate_share_url(user_id)
-                    if v4_link:
-                        nodes.append(FlattenNode.create(inbound, v4_link))
-                    if v6_link:
-                        nodes.append(FlattenNode.create(inbound, v6_link, inbound.name + '-IPv6'))
-                if isinstance(inbound, InboundXHttp):
-                    link = inbound.generate_share_url(user_id)
-                    nodes.append(FlattenNode.create(inbound, link))
-            cache.version = env.NODE_CONFIG_VERSION
-            await user.set_flatten_node_cache(cache.serialize())
+                    if isinstance(inbound, InboundReality):
+                        v4_link, v6_link = inbound.generate_share_url(user_id)
+                        if v4_link:
+                            nodes.append(FlattenNode.create(inbound, v4_link))
+                        if v6_link:
+                            nodes.append(
+                                FlattenNode.create(inbound, v6_link, inbound.name + '-IPv6')
+                            )
+                    if isinstance(inbound, InboundXHttp):
+                        link = inbound.generate_share_url(user_id)
+                        nodes.append(FlattenNode.create(inbound, link))
+                    cache.version = env.NODE_CONFIG_VERSION
+                    await user.set_flatten_node_cache(cache.serialize())
+                except httpx.RequestError:
+                    unchecked_expect(False)
         if not nodes:
             await update.message.reply_text('Sorry, there are currently no available nodes.')
             return
@@ -553,11 +566,9 @@ async def handle_update(env: Env, payload) -> Response:
                     is_ok = server.health_check()
                     check_result[server.name] = (is_ok, server.get_sys_stats() if is_ok else None)
                 except Exception:
-                    raise
-                    # pass
+                    pass
         except Exception:
-            raise
-            # pass
+            pass
         if not check_result:
             await update.message.reply_text(
                 '🔴 <b>The system may be down.</b>', parse_mode=ParseMode.HTML

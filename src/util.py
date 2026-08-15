@@ -73,3 +73,7 @@ def to_integer(s: str) -> int | None:
         return int(s)
     except Exception:
         pass
+
+
+def unchecked_expect(*args):
+    pass

@@ -1,23 +1,13 @@
-## Usage
+Copyright 2026 RedbeanW
 
-You can run the Worker defined by your new project by executing `wrangler dev` in this
-directory. This will start up an HTTP server and will allow you to iterate on your
-Worker without having to restart `wrangler`.
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
 
-### Types and autocomplete
+     http://www.apache.org/licenses/LICENSE-2.0
 
-This project also includes a pyproject.toml with some requirements which
-set up autocomplete and type hints for this Python Workers project.
-
-To get these installed you'll need `uv`, which you can install by following
-https://docs.astral.sh/uv/getting-started/installation/.
-
-Once `uv` is installed, you can run the following:
-
-```
-uv venv
-uv sync
-```
-
-Then point your editor's Python plugin at the `.venv` directory. You should then have working
-autocomplete and type information in your editor.
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.

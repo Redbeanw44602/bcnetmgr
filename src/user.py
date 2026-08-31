@@ -62,7 +62,7 @@ async def add_user(env: Env, user_id: int) -> tuple[AddUserResult, 'UserDurableO
     return AddUserResult.SUCCESS, user
 
 
-async def suspend_user(env: Env, user_id: int) -> SuspendUserResult:
+async def suspend_user(env: Env, user_id: int, is_excessive_use: bool = False) -> SuspendUserResult:
     from serv import ServList, RemoveUserResult
 
     user = UserDurableObject.get_stub(env, user_id)
@@ -70,7 +70,9 @@ async def suspend_user(env: Env, user_id: int) -> SuspendUserResult:
         return SuspendUserResult.NOT_EXISTS
     if await user.is_suspended():
         return SuspendUserResult.ALREADY_SUSPENDED
-    await user.set_group(UserGroup.SUSPENDED)
+    await user.set_group(
+        UserGroup.SUSPENDED if not is_excessive_use else UserGroup.SUSPENDED_EXCESSIVE_USE
+    )
     serv_mgr = ServList(env)
     has_error = False
     for _, inbound in serv_mgr.get_inbounds():

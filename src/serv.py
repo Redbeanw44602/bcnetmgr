@@ -126,7 +126,7 @@ async def cron_serv(env: Env, date: date_):
                 ):
                     continue
                 if used > server.daily_usage_limit:
-                    result = await suspend_user(env, user_id)
+                    result = await suspend_user(env, user_id, is_excessive_use=True)
                     if result != SuspendUserResult.SUCCESS:
                         print(f'Something went wrong, SuspendUserResult = {result}')
                     await send_notification(

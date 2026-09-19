@@ -611,7 +611,7 @@ async def handle_update(env: Env, payload) -> Response:
                 return
         user = get_user(update)
         serv_mgr = ServList(env)
-        tags, names = serv_mgr.get_tags(), serv_mgr.get_names()
+        tags, names = serv_mgr.get_tags(), serv_mgr.get_names()  # TODO: Include deleted nodes.
         assert len(tags) == len(names)
         today = get_date_now()
         YMD = '%B %d, %Y'  # TODO: Set global constants.

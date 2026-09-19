@@ -13,6 +13,7 @@ class Env:
     WEBHOOK_URL: str
     USER_CHANNEL_ID: int
     NODE_LIST: str
+    DELETED_NODE_LIST: str
     NODE_CONFIG_VERSION: int
     CF_ACCOUNT_ID: str
     CF_SCRIPT_NAME: str
@@ -41,6 +42,7 @@ class Env:
             env.WEBHOOK_URL,
             int(env.USER_CHANNEL_ID),
             env.NODE_LIST,
+            env.DELETED_NODE_LIST,
             int(env.NODE_CONFIG_VERSION),
             env.CF_ACCOUNT_ID,
             env.CF_SCRIPT_NAME,

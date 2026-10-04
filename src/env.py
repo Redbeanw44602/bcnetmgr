@@ -1,4 +1,7 @@
 from dataclasses import dataclass, field
+from typing import Any
+
+import json
 
 
 @dataclass
@@ -23,7 +26,7 @@ class Env:
     USER_DURABLE_OBJECT: object
 
     # other
-    DYNAMIC: dict[str, str] = field(default_factory=dict)
+    DYNAMIC: dict[str, Any] = field(default_factory=dict)
 
     @staticmethod
     def wrap(env):
@@ -31,8 +34,12 @@ class Env:
 
         for name in dir(env._env):  # HACK
             attr = getattr(env._env, name)
-            if len(name) >= 2 and name[0] == '_' and name[1].isupper() and type(attr) is str:
+            if type(attr) is not str:
+                continue
+            if len(name) >= 3 and name.startswith('__') and name[2].isupper():
                 dyn_env[name] = attr
+            elif len(name) >= 2 and name[0] == '_' and name[1].isupper():
+                dyn_env[name] = json.loads(attr)
 
         return Env(
             env.BOT_TOKEN,

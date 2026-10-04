@@ -1,0 +1,88 @@
+/**
+ * Use `scripts/gen_wrangler_jsonc.py` to generate `wrangler.jsonc`. The syntax of this file is 
+ * identical to that of `wrangler.jsonc`; however, to work around Cloudflare Workers' limitations 
+ * on the number and size of environment variables in the free plan, variables starting with an 
+ * underscore (`_`) will be treated as JSON dictionaries and compressed. Workers will then decompress 
+ * and parse them at runtime.
+ *
+ * For more details on how to configure Wrangler, refer to:
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "bcnetmgr",
+	"main": "src/main.py",
+	"compatibility_date": "2026-09-08",
+	"compatibility_flags": [
+		"python_workers"
+	],
+	"vars": {
+		"WEBHOOK_URL": "https://bcnetmgr.example.com/",
+		"USER_CHANNEL_ID": "-1000000000000",
+		"NODE_LIST": "US_1", // Use a semicolon to separate multiple items.
+		"NODE_CONFIG_VERSION": "1", // Increment this value when making changes that may affect the node URI.
+		"CF_ACCOUNT_ID": "FILLME",
+		"CF_SCRIPT_NAME": "bcnetmgr",
+		"CF_USER_DURABLE_OBJECT_NAMESPACE_ID": "FILLME",
+		"_US_1": {
+			"NAME": "US-1",
+			"IPV4": "FILLME",
+			"IPV6": "FILLME",
+			"GRPC_GATEWAY": "https://us1-grpc.example.com",
+			"DAILY_USAGE_LIMIT": "0", // Unit: bytes; 0 indicates no limit.
+			"INBOUNDS": {
+				"VLESS_REALITY": {
+					"NAME": "REALITY-US",
+					"TYPE": "reality",
+					"REGION": "US", // See util.py, method: emoji_from_country
+					"DESCRIPTION": "FILLME",
+					"RECOMMENDED": "1", // Optional, default: 0
+					"PORT": "443", // Optional, default: 0 (auto)
+					"DISABLE_IPV4": "0", // Optional, default: 0
+					"DISABLE_IPV6": "0", // Optional, default: 0
+					"DEFAULT_FLOW": "xtls-rprx-vision", // Optional, default: ''
+					"FINGERPRINT": "firefox",
+					"PUBLIC_KEY": "FILLME",
+				},
+				"VLESS_XHTTP": {
+					"NAME": "US-CLOUDFLARE",
+					"TYPE": "xhttp",
+					"REGION": "US",
+					"DESCRIPTION": "FILLME",
+					"SECURITY": "tls", // Optional, default: 'none'
+					"FINGERPRINT": "firefox"
+				}
+			}
+		},
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "USER_DURABLE_OBJECT",
+				"class_name": "UserDurableObject"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v2",
+			"new_sqlite_classes": [
+				"UserDurableObject"
+			]
+		}
+	],
+	"routes": [
+		{
+			"pattern": "bcnetmgr.example.com",
+			"custom_domain": true
+		}
+	],
+	"placement": {
+		"mode": "smart"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"workers_dev": false,
+	"preview_urls": false
+}

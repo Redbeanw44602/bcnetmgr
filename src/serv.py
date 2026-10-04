@@ -468,11 +468,11 @@ class ServList:
 class Serv:
     tag: str
     name: str
-    ipv4: str
-    ipv6: str
+    ipv4: str  # OPT
+    ipv6: str  # OPT
     grpc_gateway: str
     inbounds: dict[str, Inbound]
-    daily_usage_limit: int
+    daily_usage_limit: int  # OPT
 
     # runtime
     _client = httpx.Client
@@ -480,43 +480,34 @@ class Serv:
     def __init__(self, env: Env, tag: str):
         dyn_env = env.DYNAMIC
 
-        def opt_env(key, default_value):
-            return key in dyn_env and dyn_env[key] or default_value
-
-        def opt_env_bool(key, expect, default_value):
-            if key not in dyn_env:
-                return default_value
-            return dyn_env[key] == expect
-
-        pfx = f'_{tag}_'
+        data: dict = dyn_env[f'_{tag}']
         self.tag = tag
-        self.name = dyn_env[f'{pfx}NAME']
-        self.ipv4 = opt_env(f'{pfx}IPV4', None)
-        self.ipv6 = opt_env(f'{pfx}IPV6', None)
-        self.grpc_gateway = dyn_env[f'{pfx}GRPC_GATEWAY']
-        self.daily_usage_limit = int(opt_env(f'{pfx}DAILY_USAGE_LIMIT', 0))
+        self.name = data['NAME']
+        self.ipv4 = data.get('IPV4', None)
+        self.ipv6 = data.get('IPV6', None)
+        self.grpc_gateway = data['GRPC_GATEWAY']
+        self.daily_usage_limit = data.get('DAILY_USAGE_LIMIT', 0)
         self.inbounds = {}
 
-        auth_token = dyn_env[f'{pfx}GRPC_AUTH_TOKEN']
+        auth_token: str = dyn_env[f'__GRPC_AUTH_TOKEN_{tag}']
         self._client = httpx.Client(headers={'X-Auth-Token': auth_token})
 
-        inbounds = dyn_env[f'{pfx}INBOUND_LIST'].split(';')
-        for tag in inbounds:
-            pfx_ = f'{pfx}INBOUND__{tag}_'
-            name = dyn_env[f'{pfx_}NAME']
-            ttype = dyn_env[f'{pfx_}TYPE']
-            region = dyn_env[f'{pfx_}REGION']
-            description = dyn_env[f'{pfx_}DESCRIPTION']
-            recommended = opt_env_bool(f'{pfx_}RECOMMENDED', '1', False)
-            port = int(opt_env(f'{pfx_}PORT', 0))
-            disable_ipv4 = opt_env_bool(f'{pfx_}DISABLE_IPV4', '1', False)
-            disable_ipv6 = opt_env_bool(f'{pfx_}DISABLE_IPV6', '1', False)
+        for tag, inbound_ in data.get('INBOUNDS').items():
+            inbound: dict = inbound_
+            name = inbound['NAME']
+            ttype = inbound['TYPE']
+            region = inbound['REGION']
+            description = inbound['DESCRIPTION']
+            recommended = inbound.get('RECOMMENDED', False)
+            port = inbound.get('PORT', 0)
+            disable_ipv4 = inbound.get('DISABLE_IPV4', False)
+            disable_ipv6 = inbound.get('DISABLE_IPV6', False)
             if not self.ipv4:
                 disable_ipv4 = True
             if not self.ipv6:
                 disable_ipv6 = True
-            default_flow = opt_env(f'{pfx_}DEFAULT_FLOW', '')
-            security = opt_env(f'{pfx_}SECURITY', 'none')
+            default_flow = inbound.get('DEFAULT_FLOW', '')
+            security = inbound.get('SECURITY', 'none')
             inbound_args = (
                 self,
                 tag,
@@ -533,11 +524,11 @@ class Serv:
             )
             match ttype:
                 case 'reality':
-                    fingerprint = dyn_env[f'{pfx_}FINGERPRINT']
-                    public_key = dyn_env[f'{pfx_}PUBLIC_KEY']
+                    fingerprint = inbound['FINGERPRINT']
+                    public_key = inbound['PUBLIC_KEY']
                     self.inbounds[tag] = InboundReality(*inbound_args, fingerprint, public_key)
                 case 'xhttp':
-                    fingerprint = dyn_env[f'{pfx_}FINGERPRINT']
+                    fingerprint = inbound['FINGERPRINT']
                     self.inbounds[tag] = InboundXHttp(*inbound_args, fingerprint)
                 case _:
                     assert False, 'Unsupported node type'

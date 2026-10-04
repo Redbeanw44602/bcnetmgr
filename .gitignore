@@ -64,7 +64,7 @@ jspm_packages/
 .wrangler/
 
 wrangler.jsonc
-scripts
+wrangler.real.jsonc
 
 # python-specific
 python_modules/

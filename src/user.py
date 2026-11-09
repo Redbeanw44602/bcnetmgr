@@ -1,3 +1,4 @@
+from http_code import internal_server_error
 import json
 import uuid
 import asyncio
@@ -23,7 +24,7 @@ from http_code import ok, not_found, bad_request
 from env import Env
 
 
-class AddUserResult(Enum):
+class RegisterUserResult(Enum):
     SUCCESS = auto()
     ILLEGAL_USER_ID = auto()
     ALREADY_EXISTS = auto()
@@ -43,6 +44,12 @@ class ResumeUserResult(Enum):
     HAS_ERROR = auto()
 
 
+class DeleteUserResult(Enum):
+    SUCCESS = auto()
+    NOT_EXISTS = auto()
+    HAS_ERROR = auto()
+
+
 def get_all_user_durable_object_ids(env: Env) -> list[str]:
     client = cf_api_client(env)
     response = client.get(
@@ -51,15 +58,15 @@ def get_all_user_durable_object_ids(env: Env) -> list[str]:
     return [x['id'] for x in response['result']]
 
 
-async def add_user(env: Env, user_id: int) -> tuple[AddUserResult, 'UserDurableObject' | None]:
+async def add_user(env: Env, user_id: int) -> tuple[RegisterUserResult, 'UserDurableObject' | None]:
     if user_id not in range(10000000, 99999999):
-        return AddUserResult.ILLEGAL_USER_ID, None
+        return RegisterUserResult.ILLEGAL_USER_ID, None
     user_id = -user_id  # Manually added users have negative IDs.
     user = UserDurableObject.get_stub(env, user_id)
     if await user.is_registered():
-        return AddUserResult.ALREADY_EXISTS, user
+        return RegisterUserResult.ALREADY_EXISTS, user
     await user.register()
-    return AddUserResult.SUCCESS, user
+    return RegisterUserResult.SUCCESS, user
 
 
 async def suspend_user(env: Env, user_id: int, is_excessive_use: bool = False) -> SuspendUserResult:
@@ -106,6 +113,30 @@ async def resume_user(env: Env, user_id: int) -> ResumeUserResult:
     return ResumeUserResult.SUCCESS if not has_error else ResumeUserResult.HAS_ERROR
 
 
+async def delete_user(env: Env, user_id: int) -> DeleteUserResult:
+    from serv import ServList, RemoveUserResult
+
+    user = UserDurableObject.get_stub(env, user_id)
+    if not await user.is_registered():
+        return DeleteUserResult.NOT_EXISTS
+
+    serv_mgr = ServList(env)
+    for server, inbound in serv_mgr.get_inbounds():
+        try:
+            if inbound.remove_user(user_id) not in (
+                RemoveUserResult.SUCCESS,
+                RemoveUserResult.NOT_FOUND,
+            ):
+                return DeleteUserResult.HAS_ERROR
+        except httpx.RequestError:
+            return DeleteUserResult.HAS_ERROR
+
+    user = UserDurableObject.get_stub(env, user_id)
+    await user.delete()
+
+    return DeleteUserResult.SUCCESS
+
+
 async def handle_user(env: Env, path: list):
     # client = _cf_api_client(env)
 
@@ -129,11 +160,11 @@ async def handle_user(env: Env, path: list):
             return bad_request('Illegal user id.')
         result, user = await add_user(env, user_id)
         match result:
-            case AddUserResult.ILLEGAL_USER_ID:
+            case RegisterUserResult.ILLEGAL_USER_ID:
                 return bad_request('Illegal user id.')
-            case AddUserResult.ALREADY_EXISTS:
+            case RegisterUserResult.ALREADY_EXISTS:
                 return ok(f'Already exists, UUID = {await user.get_uuid()}.')
-            case AddUserResult.SUCCESS:
+            case RegisterUserResult.SUCCESS:
                 return ok(f'Completed, UUID = {await user.get_uuid()}.')
 
     async def suspend():
@@ -166,6 +197,19 @@ async def handle_user(env: Env, path: list):
             case ResumeUserResult.SUCCESS:
                 return ok('Completed, hasErr = False.')
 
+    async def delete():
+        user_id = to_integer(consume_front(path))
+        if not user_id:
+            return bad_request('Illegal user id.')
+        result = await delete_user(env, user_id)
+        match result:
+            case DeleteUserResult.NOT_EXISTS:
+                return not_found('User does not exists.')
+            case DeleteUserResult.HAS_ERROR:
+                return internal_server_error('Completed, hasErr = True.')
+            case DeleteUserResult.SUCCESS:
+                return ok('Completed, hasErr = False.')
+
     action = consume_front(path)
     match action:
         case 'list':
@@ -176,6 +220,8 @@ async def handle_user(env: Env, path: list):
             return await suspend()
         case 'resume':
             return await resume()
+        case 'delete':
+            return await delete()
         case _:
             return not_found()
 

@@ -14,6 +14,8 @@ from user import (
     UserNotification,
     FlattenNode,
     FlattenNodeCache,
+    DeleteUserResult,
+    delete_user,
 )
 from serv import (
     ServList,
@@ -436,22 +438,18 @@ async def handle_update(env: Env, payload) -> Response:
         if not await check_allowed_callback(update):
             return
         query = update.callback_query
-        user = get_user(update)
         if query.data.endswith('_yes'):
-            serv_mgr = ServList(env)
-            for server, inbound in serv_mgr.get_inbounds():
-                try:
-                    unchecked_expect(
-                        inbound.remove_user(update.effective_user.id)
-                        in (RemoveUserResult.SUCCESS, RemoveUserResult.NOT_FOUND)
-                    )
-                except httpx.RequestError:
-                    unchecked_expect(False)
-            await user.delete()
-            await query.edit_message_text('Your account has been deleted.')
+            result = await delete_user(env, update.effective_user.id)
+            if result == DeleteUserResult.SUCCESS:
+                await query.edit_message_text('Your account has been deleted.')
+            else:
+                print(f'Something went wrong, DeleteUserResult = {result}')
+                await query.edit_message_text(
+                    'Sorry, we encountered an issue while deleting your account. Please try again later.'
+                )
         else:
             await query.edit_message_text('Account deletion has been canceled.')
-        await user.set_allowed_callback(None)
+        await get_user(update).set_allowed_callback(None)
 
     async def tos(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not await is_registered(update):

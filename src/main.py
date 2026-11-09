@@ -10,7 +10,7 @@ from util import consume_front, get_date_now
 from http_code import not_found, unauthorized, ok
 from env import Env
 
-from user import UserDurableObject  # noqa: F401, required by workerd.
+from user import UserDurableObject  # Required by: workerd
 
 
 async def main(env, request: Request) -> Response:

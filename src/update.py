@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 import httpx
 from workers import Response
 from telegram import Update, Chat, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.constants import ParseMode
-from telegram.error import TelegramError, BadRequest
+from telegram.constants import ParseMode, ChatMemberStatus
+from telegram.error import BadRequest
 
 from user import (
     UserDurableObject,
@@ -96,8 +96,14 @@ async def handle_update(env: Env, payload) -> Response:
 
     async def eligibility_check(update: Update, context: ContextTypes.DEFAULT_TYPE):
         try:
-            await context.bot.get_chat_member(env.USER_CHANNEL_ID, update.effective_user.id)
-        except TelegramError:
+            user = update.effective_user
+            member = await context.bot.get_chat_member(env.USER_CHANNEL_ID, user.id)
+            assert member.status in (
+                ChatMemberStatus.ADMINISTRATOR,
+                ChatMemberStatus.OWNER,
+                ChatMemberStatus.MEMBER,
+            )
+        except Exception:
             raise ApplicationHandlerStop
 
     async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):

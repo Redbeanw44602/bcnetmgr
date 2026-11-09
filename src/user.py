@@ -1,4 +1,3 @@
-from http_code import internal_server_error
 import json
 import uuid
 import asyncio
@@ -9,6 +8,7 @@ from datetime import date as date_
 import httpx
 from workers import DurableObject
 from pyodide.ffi import JsException
+from telegram import Bot
 
 from cf import cf_api_client
 from util import (
@@ -20,7 +20,7 @@ from util import (
     date2str,
     to_integer,
 )
-from http_code import ok, not_found, bad_request
+from http_code import ok, not_found, bad_request, internal_server_error
 from env import Env
 
 
@@ -56,6 +56,16 @@ def get_all_user_durable_object_ids(env: Env) -> list[str]:
         f'https://api.cloudflare.com/client/v4/accounts/{env.CF_ACCOUNT_ID}/workers/durable_objects/namespaces/{env.CF_USER_DURABLE_OBJECT_NAMESPACE_ID}/objects'
     ).json()
     return [x['id'] for x in response['result']]
+
+
+async def get_all_registered_users(env: Env) -> list[UserDurableObject]:
+    obj_ids = get_all_user_durable_object_ids(env)
+    result = []
+    for obj_id in obj_ids:
+        user = UserDurableObject.get_stub_from_raw(env, obj_id)
+        if user and await user.is_registered():
+            result.append(user)
+    return result
 
 
 async def add_user(env: Env, user_id: int) -> tuple[RegisterUserResult, 'UserDurableObject' | None]:
@@ -148,10 +158,36 @@ async def handle_user(env: Env, path: list):
                 return bad_request('Object not found.')
             return ok(json.dumps(await user.dump(), indent=2))
         obj_ids = get_all_user_durable_object_ids(env)
-        response = f'Count: {len(obj_ids)}\n\n'
+        registered_count = 0
+        manually_added_count = 0
+        bot = Bot(env.BOT_TOKEN)
+        response = ''
         for obj_id in obj_ids:
             user = UserDurableObject.get_stub_from_raw(env, obj_id)
-            response += f'{obj_id} {await user.get_uuid()} {await user.get_user_id()}\n'
+            user_id = await user.get_user_id()
+            name = ''
+            if await user.is_registered():
+                registered_count += 1
+            if user_id:
+                if user_id < 0:
+                    manually_added_count += 1
+                else:
+                    chat = await bot.get_chat(chat_id=user_id)
+                    if chat.first_name:
+                        name += chat.first_name
+                    if chat.last_name:
+                        if name:
+                            name += ' '
+                        name += chat.last_name
+                    if name:
+                        name = f"'{name}' "
+                    if chat.username:
+                        name += f'@{chat.username}'
+            response += f'{obj_id} {await user.get_uuid()} {user_id} {name}\n'
+        response = (
+            f'Count: {len(obj_ids)} ({registered_count} registered, {len(obj_ids) - registered_count} not registered / deleted, {manually_added_count} added manually)\n\n'
+            + response
+        )
         return ok(response)
 
     async def add():

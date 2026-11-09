@@ -9,7 +9,7 @@ from telegram import Bot
 from telegram.constants import ParseMode
 
 from user import (
-    get_all_user_durable_object_ids,
+    get_all_registered_users,
     suspend_user,
     resume_user,
     UserDurableObject,
@@ -29,19 +29,16 @@ async def handle_serv(env: Env, path: list):
     serv_mgr = ServList(env)
 
     async def sync():
-        obj_ids = get_all_user_durable_object_ids(env)
+        users = await get_all_registered_users(env)
         inbounds = serv_mgr.get_inbounds()
         server_filter = consume_front(path)
 
         response = ''
         has_error = False
-        for obj_id in obj_ids:
-            user = UserDurableObject.get_stub_from_raw(env, obj_id)
+        for user in users:
             user_id = await user.get_user_id()
             uuid = await user.get_uuid()
             response += f'User (user_id = {user_id}, uuid = {uuid})\n'
-            if not user_id:  # TODO: REMOVE IT
-                continue
             if await user.is_suspended():
                 continue
             for server, inbound in inbounds:
@@ -66,7 +63,7 @@ async def handle_serv(env: Env, path: list):
 
 
 async def cron_serv(env: Env, date: date_):
-    obj_ids = get_all_user_durable_object_ids(env)
+    users = await get_all_registered_users(env)
     user_map = {}
 
     bot = Bot(env.BOT_TOKEN)
@@ -81,12 +78,8 @@ async def cron_serv(env: Env, date: date_):
             return
         await bot.send_message(user_id, text, parse_mode=ParseMode.HTML)
 
-    for obj_id in obj_ids:
-        user = UserDurableObject.get_stub_from_raw(env, obj_id)
+    for user in users:
         user_id = await user.get_user_id()
-        if not user_id:  # TODO: REMOVE IT
-            continue
-
         user_map[user_id] = user
 
         if await user.push_today_to_daily_storage_area():

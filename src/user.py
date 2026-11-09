@@ -51,7 +51,7 @@ def get_all_user_durable_object_ids(env: Env) -> list[str]:
     return [x['id'] for x in response['result']]
 
 
-async def add_user(env: Env, user_id: int) -> tuple[AddUserResult, 'UserDurableObject']:
+async def add_user(env: Env, user_id: int) -> tuple[AddUserResult, 'UserDurableObject' | None]:
     if user_id not in range(10000000, 99999999):
         return AddUserResult.ILLEGAL_USER_ID, None
     user_id = -user_id  # Manually added users have negative IDs.
@@ -282,7 +282,7 @@ class UserDurableObject(DurableObject):
         return obj
 
     @staticmethod
-    def get_stub_from_raw(env: Env, object_id: str) -> 'UserDurableObject':  # STUB
+    def get_stub_from_raw(env: Env, object_id: str) -> 'UserDurableObject' | None:  # STUB
         try:
             object_id = env.USER_DURABLE_OBJECT.idFromString(object_id)
         except JsException:  # EXCEPT: Invalid Durable Object ID
@@ -352,8 +352,8 @@ class UserDurableObject(DurableObject):
     async def get_capability(self) -> int:
         return await self.get('capability')
 
-    async def set_capability(self, capability: int):
-        capability = UserCapability(capability)
+    async def set_capability(self, capability_: int):
+        capability = UserCapability(capability_)
         await self.put('capability', capability.value)
 
     async def has_capability(self, capability: int) -> bool:
@@ -391,27 +391,27 @@ class UserDurableObject(DurableObject):
     async def _set_disabled_notification(self, notifications: UserNotification):
         await self.put('disabled_notification', notifications.value)
 
-    async def disable_notification(self, notification: int):
-        notification = UserNotification(notification)
+    async def disable_notification(self, notification_: int):
+        notification = UserNotification(notification_)
         await self._set_disabled_notification(
             UserNotification(await self.get_disabled_notification()) | notification
         )
 
-    async def enable_notification(self, notification: int):
-        notification = UserNotification(notification)
+    async def enable_notification(self, notification_: int):
+        notification = UserNotification(notification_)
         await self._set_disabled_notification(
             UserNotification(await self.get_disabled_notification()) & ~notification
         )
 
-    async def toggle_notification(self, notification: int):
-        notification = UserNotification(notification)
+    async def toggle_notification(self, notification_: int):
+        notification = UserNotification(notification_)
         if await self.is_notification_enabled(notification):
             await self.disable_notification(notification)
         else:
             await self.enable_notification(notification)
 
-    async def is_notification_enabled(self, notification: int):
-        notification = UserNotification(notification)
+    async def is_notification_enabled(self, notification_: int):
+        notification = UserNotification(notification_)
         return notification not in UserNotification(await self.get_disabled_notification())
 
     async def deduplicate_notification_day_once(self, text: str) -> bool:
@@ -485,9 +485,9 @@ class UserDurableObject(DurableObject):
             )
         return ret
 
-    async def _query_usage_stats_batched(self, dates: list[date_], tags: list[str]):
+    async def _query_usage_stats_batched(self, dates_: list[date_], tags: list[str]):
         ret = []
-        dates = [date2str(x) for x in dates]
+        dates = [date2str(x) for x in dates_]
         for tag in tags:
             up_batched = await self.get_daily_storage_area_batched(dates, f'usage:{tag}:up')
             down_batched = await self.get_daily_storage_area_batched(dates, f'usage:{tag}:down')

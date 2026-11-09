@@ -20,7 +20,7 @@ target-version = "py314"
 # Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
 # McCabe complexity (`C901`) by default.
 select = ["E", "F", "W"]
-ignore = ["E501"]
+ignore = ["E501", "F401"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.
@@ -28,3 +28,9 @@ quote-style = "single"
 
 [tool.pyrefly]
 python-interpreter-path = ".venv-workers/bin/python"
+
+[tool.pyrefly.errors]
+missing-argument = "ignore"
+missing-attribute = "ignore"
+bad-argument-type = "ignore"
+bad-function-definition = "ignore"

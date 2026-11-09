@@ -1,15 +1,17 @@
+# pyrefly: ignore-errors[missing-import]
+
 import os
 import sys
 
 # PROTOC QUIRK
 sys.path.append(os.path.join(os.path.dirname(__file__), 'xray/gen'))
 
-import app.proxyman.config_pb2  # noqa: F401
-import app.proxyman.command.command_pb2  # noqa: F401
-import proxy.vless.inbound.config_pb2  # noqa: F401
-import proxy.vless.account_pb2  # noqa: F401
-import transport.internet.reality.config_pb2  # noqa: F401
-import transport.internet.splithttp.config_pb2  # noqa: F401
+import app.proxyman.config_pb2
+import app.proxyman.command.command_pb2
+import proxy.vless.inbound.config_pb2
+import proxy.vless.account_pb2
+import transport.internet.reality.config_pb2
+import transport.internet.splithttp.config_pb2
 
 # ------
 

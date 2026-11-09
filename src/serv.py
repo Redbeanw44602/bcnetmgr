@@ -1,3 +1,4 @@
+from _collections_abc import dict_values
 from enum import Enum, auto
 from dataclasses import dataclass
 from urllib.parse import urlencode, urlunparse
@@ -184,7 +185,7 @@ def _generate_vless_share_url(
     ttype: str = None,
     flow: str = None,
     sni: str = None,
-):
+) -> str:
     query = {}
 
     def add_param(key, value):
@@ -362,15 +363,14 @@ class InboundReality(Inbound):
     fingerprint: str  # TLS-specific
     public_key: str
 
-    def generate_share_url(self, user_id: int):
+    def generate_share_url(self, user_id: int) -> tuple[str | None, str | None]:
         """
         Raises:
             httpx.RequestError: Requests to the backend service may fail.
         """
         inbound = self.get_inbound_config()
         account = self.get_user(user_id)['account']
-        if not inbound or account is None:
-            return None
+        assert inbound and account
 
         account = decode_typed_message(account)
         receiver_settings = decode_typed_message(inbound['receiverSettings'])
@@ -410,11 +410,10 @@ class InboundReality(Inbound):
 class InboundXHttp(Inbound):
     fingerprint: str  # TLS-specific
 
-    def generate_share_url(self, user_id: int):
+    def generate_share_url(self, user_id: int) -> str:
         inbound = self.get_inbound_config()
         account = self.get_user(user_id)['account']
-        if not inbound or account is None:
-            return None
+        assert inbound and account
 
         account = decode_typed_message(account)
         receiver_settings = decode_typed_message(inbound['receiverSettings'])
@@ -468,14 +467,14 @@ class ServList:
 class Serv:
     tag: str
     name: str
-    ipv4: str  # OPT
-    ipv6: str  # OPT
+    ipv4: str | None  # OPT
+    ipv6: str | None  # OPT
     grpc_gateway: str
     inbounds: dict[str, Inbound]
     daily_usage_limit: int  # OPT
 
     # runtime
-    _client = httpx.Client
+    _client: httpx.Client
 
     def __init__(self, env: Env, tag: str):
         dyn_env = env.DYNAMIC
@@ -492,7 +491,7 @@ class Serv:
         auth_token: str = dyn_env[f'__GRPC_AUTH_TOKEN_{tag}']
         self._client = httpx.Client(headers={'X-Auth-Token': auth_token})
 
-        for tag, inbound_ in data.get('INBOUNDS').items():
+        for tag, inbound_ in data['INBOUNDS'].items():
             inbound: dict = inbound_
             name = inbound['NAME']
             ttype = inbound['TYPE']
@@ -549,12 +548,12 @@ class Serv:
         response = self._client.post(f'{self.grpc_gateway}{path}', json=payload)
         return response.json()
 
-    def get_inbounds(self) -> list[Inbound]:
+    def get_inbounds(self) -> dict_values[str, Inbound]:
         return self.inbounds.values()
 
     def get_usage_stats(
         self, user_id: int, up=False, down=False, reset=False
-    ) -> tuple[GetUsageStatsResult, int]:
+    ) -> tuple[GetUsageStatsResult, int | None]:
         """
         Raises:
             httpx.RequestError: Requests to the backend service may fail.

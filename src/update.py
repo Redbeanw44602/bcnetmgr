@@ -561,7 +561,7 @@ async def handle_update(env: Env, payload) -> Response:
         try:
             serv_mgr = ServList(env)
             for server in serv_mgr.get_servers():
-                check_result[server.name] = ()
+                check_result[server.name] = None
                 try:
                     is_ok = server.health_check()
                     check_result[server.name] = (is_ok, server.get_sys_stats() if is_ok else None)

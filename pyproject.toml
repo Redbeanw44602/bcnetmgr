@@ -3,11 +3,28 @@ name = "bcnetmgr"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = [
-    "python-telegram-bot>=22.7",
-    "protobuf>=7.35.0",
-]
+requires-python = ">=3.14"
+dependencies = ["python-telegram-bot>=22.7", "protobuf>=7.35.0"]
 
 [dependency-groups]
 dev = ["workers-py", "workers-runtime-sdk"]
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+
+target-version = "py314"
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+# Unlike Flake8, Ruff doesn't enable pycodestyle warnings (`W`) or
+# McCabe complexity (`C901`) by default.
+select = ["E", "F", "W"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+# Like Black, use double quotes for strings.
+quote-style = "single"
+
+[tool.pyrefly]
+python-interpreter-path = ".venv-workers/bin/python"
